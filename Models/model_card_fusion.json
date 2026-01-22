@@ -1,0 +1,91 @@
+{
+  "audio": {
+    "checkpoint": "C:\\Users\\khodj\\Documents\\M2_ISI\\PFE\\Models\\Wav2vec.pt",
+    "labels_8": [
+      "neutral",
+      "calm",
+      "happy",
+      "sad",
+      "anger",
+      "fear",
+      "disgust",
+      "surprise"
+    ],
+    "meta": {
+      "model_name": "facebook/wav2vec2-base",
+      "hidden_size": 768,
+      "pooling": "mean",
+      "sample_rate": 16000,
+      "max_length": 80000,
+      "epoch": 10,
+      "val_acc": 0.7416666666666667,
+      "val_loss": 0.7566614943246047
+    },
+    "reconstructed": false
+  },
+  "video": {
+    "checkpoint": "C:\\Users\\khodj\\Documents\\M2_ISI\\PFE\\Models\\Resnet18.pt",
+    "labels_8": [
+      "neutral",
+      "happy",
+      "sad",
+      "surprise",
+      "fear",
+      "anger",
+      "disgust",
+      "contempt"
+    ],
+    "meta": {
+      "img_size": 224,
+      "imagenet_norm": {
+        "mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "std": [
+          0.229,
+          0.224,
+          0.225
+        ]
+      },
+      "epoch": 4,
+      "val_acc": 0.7455913978494624
+    },
+    "reconstructed": true
+  },
+  "fusion": {
+    "final_labels_9": [
+      "anger",
+      "calm",
+      "contempt",
+      "disgust",
+      "fear",
+      "happy",
+      "neutral",
+      "sad",
+      "surprise"
+    ],
+    "audio_to_final": [
+      6,
+      1,
+      5,
+      7,
+      0,
+      4,
+      3,
+      8
+    ],
+    "video_to_final": [
+      6,
+      5,
+      7,
+      8,
+      4,
+      0,
+      3,
+      2
+    ],
+    "method": "late_fusion_logits_weighted"
+  }
+}
