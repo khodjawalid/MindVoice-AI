@@ -1,7 +1,7 @@
 # app/api/routes/wellness.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from app.db.supabase import supabase
 
 router = APIRouter(prefix="/wellness", tags=["wellness"])
@@ -9,23 +9,20 @@ router = APIRouter(prefix="/wellness", tags=["wellness"])
 BATCH_SIZE = 1000
 
 
-def fetch_all_rows(table: str, select: str, filters: Optional[dict] = None, order_by: Optional[str] = None):
-    """Fetch all rows from a table using pagination (Supabase default limit is 1000)."""
+def fetch_by_date(table: str, date: str, order_by: str = "datetime_utc") -> List[dict]:
+    """Fetch all rows from a table for a specific date."""
     all_data = []
     offset = 0
 
     while True:
-        query = supabase.table(table).select(select)
-
-        if filters:
-            for key, value in filters.items():
-                query = query.eq(key, value)
-
-        if order_by:
-            query = query.order(order_by, desc=False)
-
-        query = query.range(offset, offset + BATCH_SIZE - 1)
-        res = query.execute()
+        res = (
+            supabase.table(table)
+            .select("*")
+            .eq("record_date", date)
+            .order(order_by, desc=False)
+            .range(offset, offset + BATCH_SIZE - 1)
+            .execute()
+        )
 
         all_data.extend(res.data)
 
@@ -37,85 +34,103 @@ def fetch_all_rows(table: str, select: str, filters: Optional[dict] = None, orde
     return all_data
 
 
-class TagReviewUpdate(BaseModel):
+def get_available_dates() -> List[str]:
+    """Get all distinct dates that have tags."""
+    res = (
+        supabase.table("tags")
+        .select("record_date")
+        .order("record_date", desc=True)
+        .execute()
+    )
+
+    # Extract unique dates
+    dates = list(set(row["record_date"] for row in res.data))
+    dates.sort(reverse=True)
+    return dates
+
+
+def get_latest_date() -> Optional[str]:
+    """Get the most recent date with tags."""
+    dates = get_available_dates()
+    return dates[0] if dates else None
+
+
+class TagUpdate(BaseModel):
     emotion_label: Optional[str] = None
     stress_level: Optional[int] = None
     video_url: Optional[str] = None
     reviewed: Optional[bool] = None
 
 
-@router.get("/init")
-def init_tag_reviews():
-    """Create tag_reviews for each has_tag=true in biometrics_demo"""
-
-    # Get all biometrics with has_tag=true
-    tagged = fetch_all_rows(
-        table="biometrics_demo",
-        select="id, timestamp_unix",
-        filters={"has_tag": True}
-    )
-
-    # Get existing reviews
-    existing = fetch_all_rows(
-        table="tag_reviews",
-        select="biometric_id"
-    )
-    existing_ids = {r["biometric_id"] for r in existing}
-
-    # Insert new ones only
-    new_reviews = [
-        {
-            "biometric_id": bio["id"],
-            "timestamp_unix": bio["timestamp_unix"],
-            "reviewed": False
-        }
-        for bio in tagged
-        if bio["id"] not in existing_ids
-    ]
-
-    if new_reviews:
-        supabase.table("tag_reviews").insert(new_reviews).execute()
-
-    return {
-        "tags_found": len(tagged),
-        "reviews_created": len(new_reviews)
-    }
+@router.get("/dates")
+def list_available_dates():
+    """Return list of all dates that have tags, sorted descending."""
+    dates = get_available_dates()
+    return {"dates": dates}
 
 
 @router.get("/tags")
-def get_tags():
-    """Get all tag reviews"""
-    data = fetch_all_rows(
-        table="tag_reviews",
-        select="*",
-        order_by="timestamp_unix"
-    )
-    return {"data": data, "count": len(data)}
+def get_tags(date: Optional[str] = None):
+    """Get all tags for a specific date."""
+    # Default to latest date if not specified
+    if date is None:
+        date = get_latest_date()
+
+    if date is None:
+        return {"date": None, "data": [], "count": 0, "message": "No data available"}
+
+    # Fetch all tags for the date
+    data = fetch_by_date("tags", date, order_by="timestamp")
+
+    return {"date": date, "data": data, "count": len(data)}
 
 
 @router.get("/tags/pending")
-def get_pending_tags():
-    """Get unreviewed tags only"""
-    data = fetch_all_rows(
-        table="tag_reviews",
-        select="*",
-        filters={"reviewed": False},
-        order_by="timestamp_unix"
-    )
-    return {"data": data, "count": len(data)}
+def get_pending_tags(date: Optional[str] = None):
+    """Get unreviewed tags only for a specific date."""
+    if date is None:
+        date = get_latest_date()
+
+    if date is None:
+        return {"date": None, "data": [], "count": 0}
+
+    all_data = []
+    offset = 0
+
+    while True:
+        res = (
+            supabase.table("tags")
+            .select("*")
+            .eq("record_date", date)
+            .eq("reviewed", False)
+            .order("timestamp", desc=False)
+            .range(offset, offset + BATCH_SIZE - 1)
+            .execute()
+        )
+
+        all_data.extend(res.data)
+
+        if len(res.data) < BATCH_SIZE:
+            break
+
+        offset += BATCH_SIZE
+
+    return {"date": date, "data": all_data, "count": len(all_data)}
 
 
-@router.patch("/tags/{review_id}")
-def update_tag(review_id: str, update: TagReviewUpdate):
-    """Update a tag review"""
-    
+@router.patch("/tags/{tag_id}")
+def update_tag(tag_id: str, update: TagUpdate):
+    """Update a tag with review data (emotion, stress level, etc.)."""
+
     data = update.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=400, detail="Nothing to update")
 
-    result = supabase.table("tag_reviews").update(data).eq("id", review_id).execute()
-    
+    result = (
+        supabase.table("tags").update(data).eq("id", tag_id).execute()
+    )
+
     if not result.data:
-        raise HTTPException(status_code=404, detail="Review not found")
+        raise HTTPException(status_code=404, detail="Tag not found")
 
     return {"data": result.data[0]}

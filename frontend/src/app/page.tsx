@@ -3,19 +3,32 @@
 import Link from "next/link";
 import { useState } from "react";
 
+interface SyncResult {
+  status: string;
+  date?: string;
+  migration?: {
+    status: string;
+    results?: {
+      eda_aggregated?: { status: string; rows_uploaded?: number };
+      hr_aggregated?: { status: string; rows_uploaded?: number };
+      tags?: { status: string; rows_uploaded?: number };
+    };
+  };
+}
+
 export default function Home() {
-  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const handleSync = async () => {
     setSyncing(true);
-    setSyncStatus(null);
+    setSyncResult(null);
     try {
       const res = await fetch("/api/sync", { method: "POST" });
       const data = await res.json();
-      setSyncStatus(data.status);
+      setSyncResult(data);
     } catch {
-      setSyncStatus("error");
+      setSyncResult({ status: "error" });
     }
     setSyncing(false);
   };
@@ -40,10 +53,24 @@ export default function Home() {
         >
           {syncing ? "Syncing..." : "Sync Empatica"}
         </button>
-        {syncStatus && (
-          <p className={`text-sm ${syncStatus === "error" ? "text-red-600" : "text-green-600"}`}>
-            Status: {syncStatus}
-          </p>
+        {syncResult && (
+          <div className="text-sm space-y-1">
+            <p className={syncResult.status === "error" ? "text-red-600" : "text-green-600"}>
+              Sync: {syncResult.status} {syncResult.date && `(${syncResult.date})`}
+            </p>
+            {syncResult.migration && (
+              <div className="pl-4 text-gray-600">
+                <p>Migration: {syncResult.migration.status}</p>
+                {syncResult.migration.results && (
+                  <ul className="pl-4 text-xs">
+                    <li>EDA: {syncResult.migration.results.eda_aggregated?.rows_uploaded ?? 0} rows</li>
+                    <li>HR: {syncResult.migration.results.hr_aggregated?.rows_uploaded ?? 0} rows</li>
+                    <li>Tags: {syncResult.migration.results.tags?.rows_uploaded ?? 0} rows</li>
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </section>
     </main>

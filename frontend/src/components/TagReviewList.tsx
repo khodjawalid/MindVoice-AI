@@ -13,7 +13,10 @@ import { TagEditModal } from "./TagEditModal";
 
 interface TagReview {
   id: string;
-  timestamp_unix: number;
+  tag_id?: string;
+  record_date?: string;
+  timestamp: number;
+  datetime_utc?: string;
   emotion_label: string | null;
   stress_level: number | null;
   video_url: string | null;
@@ -23,10 +26,22 @@ interface TagReview {
 
 interface TagReviewListProps {
   data: TagReview[];
+  onUpdate?: () => void;
 }
 
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
+function formatTime(tag: TagReview): string {
+  // Use datetime_utc if available, fallback to timestamp
+  if (tag.datetime_utc) {
+    const date = new Date(tag.datetime_utc);
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  // Fallback for old data format
+  const date = new Date(tag.timestamp * 1000);
   return date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
@@ -34,9 +49,14 @@ function formatTime(timestamp: number): string {
   });
 }
 
-export function TagReviewList({ data: initialData }: TagReviewListProps) {
+export function TagReviewList({ data: initialData, onUpdate }: TagReviewListProps) {
   const [data, setData] = useState<TagReview[]>(initialData);
   const [selectedTag, setSelectedTag] = useState<TagReview | null>(null);
+
+  // Update data when initialData changes
+  if (initialData !== data && initialData.length > 0) {
+    setData(initialData);
+  }
 
   const handleSave = async (updates: Partial<TagReview>) => {
     if (!selectedTag) return;
@@ -52,6 +72,8 @@ export function TagReviewList({ data: initialData }: TagReviewListProps) {
       setData((prev) =>
         prev.map((tag) => (tag.id === selectedTag.id ? { ...tag, ...updatedTag } : tag))
       );
+      // Notify parent to refresh data
+      onUpdate?.();
     }
   };
 
@@ -59,7 +81,7 @@ export function TagReviewList({ data: initialData }: TagReviewListProps) {
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground">
-          No tagged events found. Initialize a session first.
+          No tagged events found for this date.
         </CardContent>
       </Card>
     );
@@ -78,7 +100,7 @@ export function TagReviewList({ data: initialData }: TagReviewListProps) {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  {formatTime(tag.timestamp_unix)}
+                  {formatTime(tag)}
                 </CardTitle>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
