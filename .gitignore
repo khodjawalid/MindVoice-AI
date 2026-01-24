@@ -1,1 +1,34 @@
-ravdess_data/
+# Secrets - CRITICAL: AWS & Supabase credentials
+.env
+backend/.env
+
+# Data files
+empatica/
+*.avro
+*.csv
+
+# ML models (too large: 400MB+)
+*.pt
+*.pth
+*.onnx
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+.next/
+*.tsbuildinfo
+
+# IDE / OS
+.DS_Store
+.claude/
+.idea/
+.vscode/
+*.swp
+
+# Archives
+archives/
