@@ -27,6 +27,18 @@ CREATE TABLE IF NOT EXISTS hr_aggregated (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Table Stress Scores Aggregated (per-minute inference results)
+CREATE TABLE IF NOT EXISTS stress_scores_aggregated (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    record_date DATE NOT NULL,              -- Ex: 2026-01-22
+    datetime_utc TIMESTAMPTZ NOT NULL,
+    stress_proba DOUBLE PRECISION,          -- Probability of stress (0-1)
+    stress_pred INTEGER,                    -- Binary prediction (0 or 1)
+    eda_coverage DOUBLE PRECISION,          -- Coverage ratio for EDA signal
+    hr_coverage DOUBLE PRECISION,           -- Coverage ratio for HR signal
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Table Tags (with review fields for wellness workflow)
 CREATE TABLE IF NOT EXISTS tags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,6 +63,7 @@ ALTER TABLE tags ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_eda_date ON eda_aggregated(record_date);
 CREATE INDEX IF NOT EXISTS idx_hr_date ON hr_aggregated(record_date);
 CREATE INDEX IF NOT EXISTS idx_tags_date ON tags(record_date);
+CREATE INDEX IF NOT EXISTS idx_stress_scores_date ON stress_scores_aggregated(record_date);
 
 -- Example query for a week of data:
 -- SELECT * FROM eda_aggregated
