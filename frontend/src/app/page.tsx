@@ -37,6 +37,9 @@ export default function Home() {
     <main className="p-8 space-y-8">
       <h1 className="text-2xl font-bold">MindVoice</h1>
       <nav className="space-y-2">
+        <Link href="/dashboard" className="block text-blue-600 hover:underline">
+          Stress Dashboard &rarr;
+        </Link>
         <Link href="/metrics" className="block text-blue-600 hover:underline">
           View Metrics &rarr;
         </Link>
