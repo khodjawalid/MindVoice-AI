@@ -1,28 +1,22 @@
 import { NextRequest } from "next/server";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const res = await fetch("http://localhost:8000/wellness/tags", {
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get("date");
+
+    // Build backend URL with optional date parameter
+    const backendUrl = date
+      ? `http://localhost:8000/wellness/tags?date=${date}`
+      : "http://localhost:8000/wellness/tags";
+
+    const res = await fetch(backendUrl, {
       cache: "no-store",
     });
+
     if (!res.ok) {
       return Response.json({ data: [], count: 0 }, { status: res.status });
     }
-    return Response.json(await res.json());
-  } catch {
-    return Response.json(
-      { error: "Backend unavailable" },
-      { status: 503 }
-    );
-  }
-}
-
-export async function POST() {
-  try {
-    const res = await fetch("http://localhost:8000/wellness/init", {
-      method: "POST",
-      cache: "no-store",
-    });
     return Response.json(await res.json());
   } catch {
     return Response.json(

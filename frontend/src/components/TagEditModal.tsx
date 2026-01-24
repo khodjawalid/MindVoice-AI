@@ -8,7 +8,10 @@ import { StressLevelSelector } from "./StressLevelSelector";
 
 interface TagReview {
   id: string;
-  timestamp_unix: number;
+  tag_id?: string;
+  record_date?: string;
+  timestamp: number;
+  datetime_utc?: string;
   emotion_label: string | null;
   stress_level: number | null;
   video_url: string | null;
@@ -22,8 +25,19 @@ interface TagEditModalProps {
   onSave: (data: Partial<TagReview>) => Promise<void>;
 }
 
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
+function formatTime(tag: TagReview): string {
+  // Use datetime_utc if available, fallback to timestamp
+  if (tag.datetime_utc) {
+    const date = new Date(tag.datetime_utc);
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  // Fallback for old data format
+  const date = new Date(tag.timestamp * 1000);
   return date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
@@ -82,7 +96,7 @@ export function TagEditModal({ tag, isOpen, onClose, onSave }: TagEditModalProps
             {/* Header */}
             <div className="sticky top-0 bg-background border-b px-6 py-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">
-                Edit Tag - {formatTime(tag.timestamp_unix)}
+                Edit Tag - {formatTime(tag)}
               </h2>
               <button
                 onClick={onClose}

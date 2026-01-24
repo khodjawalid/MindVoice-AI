@@ -10,14 +10,14 @@ import {
   ReferenceLine,
   Tooltip,
 } from "recharts";
-import { Heart } from "lucide-react";
+import { Activity } from "lucide-react";
 
-interface HRDataPoint {
+interface EDADataPoint {
   datetime_utc: string;
-  hr_mean: number;
-  hr_std: number;
-  hr_min: number;
-  hr_max: number;
+  eda_mean: number;
+  eda_std: number;
+  eda_min: number;
+  eda_max: number;
   sample_count: number;
 }
 
@@ -26,8 +26,8 @@ interface TagPoint {
   timestamp: number;
 }
 
-interface HeartRateChartProps {
-  data: HRDataPoint[];
+interface EDAChartProps {
+  data: EDADataPoint[];
   tags?: TagPoint[];
   isLoading?: boolean;
 }
@@ -41,7 +41,7 @@ const formatTime = (datetime: string) => {
 
 interface CustomTooltipProps {
   active?: boolean;
-  payload?: Array<{ value: number; payload: HRDataPoint }>;
+  payload?: Array<{ value: number; payload: EDADataPoint }>;
 }
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
@@ -53,10 +53,10 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
           {formatTime(dataPoint.datetime_utc)}
         </p>
         <p className="text-foreground font-medium">
-          {Math.round(payload[0].value)} bpm
+          {payload[0].value.toFixed(2)} µS
         </p>
         <p className="text-xs text-muted-foreground">
-          Range: {Math.round(dataPoint.hr_min)}-{Math.round(dataPoint.hr_max)}
+          Range: {dataPoint.eda_min.toFixed(2)}-{dataPoint.eda_max.toFixed(2)}
         </p>
       </div>
     );
@@ -64,22 +64,22 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   return null;
 };
 
-export const HeartRateChart = ({
+export const EDAChart = ({
   data,
   tags = [],
   isLoading,
-}: HeartRateChartProps) => {
+}: EDAChartProps) => {
   const validData = useMemo(() => {
     return data.filter(
-      (d) => typeof d.hr_mean === "number" && d.hr_mean !== null
+      (d) => typeof d.eda_mean === "number" && d.eda_mean !== null
     );
   }, [data]);
 
-  const displayAvgHR = useMemo(() => {
+  const displayAvgEDA = useMemo(() => {
     if (validData.length === 0) return 0;
-    return Math.round(
-      validData.reduce((sum, d) => sum + d.hr_mean, 0) / validData.length
-    );
+    return (
+      validData.reduce((sum, d) => sum + d.eda_mean, 0) / validData.length
+    ).toFixed(2);
   }, [validData]);
 
   // Create a set of tag times for quick lookup
@@ -92,12 +92,21 @@ export const HeartRateChart = ({
     return validData.filter((d) => tagTimes.has(formatTime(d.datetime_utc)));
   }, [validData, tagTimes]);
 
+  // Calculate Y-axis domain dynamically
+  const yDomain = useMemo(() => {
+    if (validData.length === 0) return [0, 25];
+    const values = validData.map((d) => d.eda_mean);
+    const min = Math.max(0, Math.floor(Math.min(...values) - 1));
+    const max = Math.ceil(Math.max(...values) + 1);
+    return [min, max];
+  }, [validData]);
+
   if (isLoading) {
     return (
       <div className="metric-card">
         <div className="flex items-center gap-2 mb-4">
-          <Heart className="w-5 h-5 text-primary" />
-          <h3 className="font-medium text-foreground">Heart Rate</h3>
+          <Activity className="w-5 h-5 text-primary" />
+          <h3 className="font-medium text-foreground">Electrodermal Activity</h3>
         </div>
         <div className="h-48 flex items-center justify-center">
           <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -110,11 +119,11 @@ export const HeartRateChart = ({
     return (
       <div className="metric-card">
         <div className="flex items-center gap-2 mb-4">
-          <Heart className="w-5 h-5 text-primary" />
-          <h3 className="font-medium text-foreground">Heart Rate</h3>
+          <Activity className="w-5 h-5 text-primary" />
+          <h3 className="font-medium text-foreground">Electrodermal Activity</h3>
         </div>
         <div className="h-48 flex items-center justify-center">
-          <p className="text-muted-foreground">No heart rate data available</p>
+          <p className="text-muted-foreground">No EDA data available</p>
         </div>
       </div>
     );
@@ -124,8 +133,8 @@ export const HeartRateChart = ({
     <div className="metric-card">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Heart className="w-5 h-5 text-primary" />
-          <h3 className="font-medium text-foreground">Heart Rate</h3>
+          <Activity className="w-5 h-5 text-primary" />
+          <h3 className="font-medium text-foreground">Electrodermal Activity</h3>
           {tags.length > 0 && (
             <span className="text-xs bg-red-500/20 text-red-600 px-2 py-0.5 rounded-full">
               {tags.length} tag{tags.length > 1 ? "s" : ""}
@@ -139,9 +148,9 @@ export const HeartRateChart = ({
 
       <div className="mb-6">
         <span className="text-4xl font-serif font-medium text-foreground">
-          {displayAvgHR}
+          {displayAvgEDA}
         </span>
-        <span className="text-muted-foreground ml-2">avg bpm</span>
+        <span className="text-muted-foreground ml-2">avg µS</span>
       </div>
 
       <div className="h-48">
@@ -159,20 +168,15 @@ export const HeartRateChart = ({
               interval={Math.floor(validData.length / 5)}
             />
             <YAxis
-              domain={[40, 140]}
-              ticks={[45, 80, 140]}
+              domain={yDomain}
               tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
               axisLine={false}
               tickLine={false}
+              tickFormatter={(v) => v.toFixed(1)}
             />
             <Tooltip
               content={<CustomTooltip />}
               cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
-            />
-            <ReferenceLine
-              y={80}
-              stroke="hsl(var(--border))"
-              strokeDasharray="4 4"
             />
             {taggedDataPoints.map((tag, idx) => (
               <ReferenceLine
@@ -190,13 +194,13 @@ export const HeartRateChart = ({
             ))}
             <Line
               type="monotone"
-              dataKey="hr_mean"
-              stroke="var(--sage)"
+              dataKey="eda_mean"
+              stroke="#8b5cf6"
               strokeWidth={2}
               dot={false}
               activeDot={{
                 r: 6,
-                fill: "var(--sage)",
+                fill: "#8b5cf6",
                 stroke: "hsl(var(--background))",
                 strokeWidth: 2,
               }}
@@ -206,7 +210,7 @@ export const HeartRateChart = ({
         </ResponsiveContainer>
       </div>
 
-      <div className="h-3 bg-olive rounded-full mt-4" />
+      <div className="h-3 bg-violet-500/30 rounded-full mt-4" />
     </div>
   );
 };

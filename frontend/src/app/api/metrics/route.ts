@@ -1,8 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const res = await fetch("http://localhost:8000/metrics", {
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get("date");
+
+    // Build backend URL with optional date parameter
+    const backendUrl = date
+      ? `http://localhost:8000/metrics?date=${date}`
+      : "http://localhost:8000/metrics";
+
+    const res = await fetch(backendUrl, {
       cache: "no-store",
     });
 

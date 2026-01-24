@@ -3,21 +3,27 @@
 import dynamic from "next/dynamic";
 
 const HeartRateChart = dynamic(
-  () => import("@/components/HeartRateChart").then(mod => mod.HeartRateChart),
+  () => import("@/components/HeartRateChart").then((mod) => mod.HeartRateChart),
   { ssr: false, loading: () => <div className="metric-card h-80 animate-pulse" /> }
 );
 
-interface DataPoint {
-  timestamp_unix: number;
-  timestamp_iso: string;
-  heart_rate: number | null;
-  eda: number | null;
-  has_tag: boolean;
+interface HRDataPoint {
+  datetime_utc: string;
+  hr_mean: number;
+  hr_std: number;
+  hr_min: number;
+  hr_max: number;
+  sample_count: number;
+}
+
+interface TagPoint {
+  datetime_utc: string;
+  timestamp: number;
 }
 
 interface HeartRateChartWrapperProps {
-  data: DataPoint[];
-  avgHR?: number;
+  data: HRDataPoint[];
+  tags?: TagPoint[];
   isLoading?: boolean;
 }
 

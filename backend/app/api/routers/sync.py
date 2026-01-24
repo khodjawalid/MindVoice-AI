@@ -10,6 +10,7 @@ from app.services.empatica.s3_sync import (
     get_utc_yesterday,
 )
 from app.services.empatica.avro_processor import process_empatica_avro, find_avro_files
+from app.services.migration import SignalUploader
 from pathlib import Path
 
 router = APIRouter(prefix="/sync", tags=["sync"])
@@ -83,4 +84,48 @@ def sync_empatica(payload: EmpaticaSyncRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Empatica sync failed: {str(e)}",
+        )
+
+
+@router.post("/migrate/{date}")
+def migrate_signals(date: str):
+    """
+    Migrate the 3 aggregated signals for a date to Supabase.
+
+    Uploads to tables:
+    - eda_aggregated: EDA per-minute (~1.4K rows/day)
+    - hr_aggregated: HR per-minute (~1.4K rows/day)
+    - tags: User-tagged events (~12 rows/day)
+
+    This endpoint is idempotent - it will delete existing data for the date
+    before inserting new data.
+    """
+    try:
+        uploader = SignalUploader()
+        results = uploader.upload_day(date)
+
+        # Check if any uploads failed
+        errors = [
+            (table, result)
+            for table, result in results.items()
+            if result.get("status") == "error"
+        ]
+
+        if errors:
+            return {
+                "status": "partial_failure",
+                "date": date,
+                "results": results,
+            }
+
+        return {
+            "status": "success",
+            "date": date,
+            "results": results,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Migration failed: {str(e)}",
         )
