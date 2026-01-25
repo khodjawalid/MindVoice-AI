@@ -319,7 +319,7 @@ def get_dashboard_summary(date: str):
     scores = check_existing_scores(date)
     tags = fetch_tags_by_date(date)
     reviewed_tags = [t for t in tags if t.get("reviewed")]
-    
+
     summary = {}
     if scores:
         valid_scores = [s for s in scores if s.get("stress_proba") is not None]
@@ -332,12 +332,84 @@ def get_dashboard_summary(date: str):
                 "total_windows": len(scores),
                 "valid_windows": len(valid_scores),
             }
-    
+
     return {
         "date": date,
         "has_scores": len(scores) > 0,
         "scores_count": len(scores),
         "tags_count": len(tags),
         "reviewed_tags_count": len(reviewed_tags),
+        "summary": summary
+    }
+
+
+def fetch_video_inferences_by_date(date: str) -> List[dict]:
+    """Fetch all video inferences for a specific date."""
+    all_data = []
+    offset = 0
+
+    while True:
+        res = (
+            supabase.table("video_inferences")
+            .select("*")
+            .eq("record_date", date)
+            .order("created_at", desc=False)
+            .range(offset, offset + BATCH_SIZE - 1)
+            .execute()
+        )
+
+        all_data.extend(res.data)
+
+        if len(res.data) < BATCH_SIZE:
+            break
+
+        offset += BATCH_SIZE
+
+    return all_data
+
+
+@router.get("/video-inferences/{date}")
+def get_video_inferences(date: str):
+    """
+    Get all video emotion inferences for a specific date.
+
+    Returns:
+        Video inference results from multimodal (vision + audio) analysis
+    """
+    inferences = fetch_video_inferences_by_date(date)
+
+    # Calculate summary if there are inferences
+    summary = {}
+    if inferences:
+        # Aggregate emotion probabilities
+        emotion_totals: dict[str, list] = {}
+        for inference in inferences:
+            probs = inference.get("emotion_probabilities", {})
+            for emotion, prob in probs.items():
+                if emotion not in emotion_totals:
+                    emotion_totals[emotion] = []
+                emotion_totals[emotion].append(prob)
+
+        # Calculate averages
+        emotion_averages = {
+            emotion: sum(probs) / len(probs)
+            for emotion, probs in emotion_totals.items()
+            if probs
+        }
+
+        # Find dominant emotion
+        dominant_emotion = max(emotion_averages.items(), key=lambda x: x[1]) if emotion_averages else (None, 0)
+
+        summary = {
+            "total_recordings": len(inferences),
+            "dominant_emotion": dominant_emotion[0],
+            "dominant_confidence": round(dominant_emotion[1], 3),
+            "emotion_averages": {k: round(v, 3) for k, v in emotion_averages.items()},
+        }
+
+    return {
+        "date": date,
+        "data": inferences,
+        "count": len(inferences),
         "summary": summary
     }

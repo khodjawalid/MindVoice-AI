@@ -90,9 +90,9 @@ export function TagReviewList({ data: initialData, onUpdate }: TagReviewListProp
   return (
     <>
       <div className="space-y-4">
-        {data.map((tag) => (
+        {data.map((tag, index) => (
           <Card
-            key={tag.id}
+            key={tag.id || `tag-${tag.timestamp}-${index}`}
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => setSelectedTag(tag)}
           >

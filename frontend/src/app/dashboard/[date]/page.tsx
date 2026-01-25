@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import StressScoreChart from "@/components/StressScoreChart";
+import { VideoInferenceChart } from "@/components/VideoInferenceChart";
 import { ArrowLeft, RefreshCw, Calendar, Tag } from "lucide-react";
 
 interface StressScore {
@@ -24,6 +25,16 @@ interface TagData {
   reviewed?: boolean;
 }
 
+interface VideoInference {
+  id: string;
+  tag_id: string;
+  record_date: string;
+  predicted_emotion: string;
+  pred_confidence: number;
+  emotion_probabilities: Record<string, number>;
+  created_at: string;
+}
+
 interface DashboardData {
   date: string;
   scores: StressScore[];
@@ -38,12 +49,25 @@ interface DashboardData {
   has_data: boolean;
 }
 
+interface VideoInferenceData {
+  date: string;
+  data: VideoInference[];
+  count: number;
+  summary: {
+    total_recordings?: number;
+    dominant_emotion?: string;
+    dominant_confidence?: number;
+    emotion_averages?: Record<string, number>;
+  };
+}
+
 export default function DashboardDatePage() {
   const params = useParams();
   const router = useRouter();
   const date = params.date as string;
 
   const [data, setData] = useState<DashboardData | null>(null);
+  const [videoInferences, setVideoInferences] = useState<VideoInferenceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [inferring, setInferring] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,12 +76,22 @@ export default function DashboardDatePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/dashboard?date=${date}`);
-      if (!res.ok) {
+      // Fetch both dashboard data and video inferences in parallel
+      const [dashboardRes, videoRes] = await Promise.all([
+        fetch(`/api/dashboard?date=${date}`),
+        fetch(`/api/dashboard/video-inferences?date=${date}`),
+      ]);
+
+      if (!dashboardRes.ok) {
         throw new Error("Failed to fetch dashboard data");
       }
-      const result = await res.json();
-      setData(result);
+      const dashboardResult = await dashboardRes.json();
+      setData(dashboardResult);
+
+      if (videoRes.ok) {
+        const videoResult = await videoRes.json();
+        setVideoInferences(videoResult);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     }
@@ -193,6 +227,13 @@ export default function DashboardDatePage() {
             data={data.scores}
             tags={data.tags}
             isLoading={loading}
+          />
+
+          {/* Video Emotion Analysis Chart */}
+          <VideoInferenceChart
+            inferences={videoInferences?.data || []}
+            date={date}
+            tags={data.tags}
           />
 
           {/* Reviewed Tags Section */}
