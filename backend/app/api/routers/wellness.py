@@ -1,10 +1,19 @@
 # app/api/routes/wellness.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional, List
+from pathlib import Path
+import tempfile
+import os
+
 from app.db.supabase import supabase
 
 router = APIRouter(prefix="/wellness", tags=["wellness"])
+
+# Model paths for inference
+MODELS_DIR = Path(__file__).parent.parent.parent.parent / "models"
+AUDIO_MODEL_PATH = MODELS_DIR / "best_model_audio.pt"
+VIDEO_MODEL_PATH = MODELS_DIR / "best_model_image.pt"
 
 BATCH_SIZE = 1000
 
@@ -132,5 +141,124 @@ def update_tag(tag_id: str, update: TagUpdate):
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Tag not found")
+
+    return {"data": result.data[0]}
+
+
+class VideoInferenceResult(BaseModel):
+    """Response model for video inference."""
+    id: str
+    tag_id: str
+    predicted_emotion: str
+    pred_confidence: float
+    emotion_probabilities: dict
+
+
+@router.post("/tags/{tag_id}/inference")
+async def run_tag_video_inference(
+    tag_id: str,
+    video: UploadFile = File(..., description="Video file for emotion inference"),
+):
+    """
+    Run video emotion inference for a specific tag.
+
+    Uploads the video, runs late fusion inference (vision + audio),
+    stores the result in the video_inferences table, and deletes the video.
+    """
+    # Verify tag exists and get its record_date
+    tag_result = supabase.table("tags").select("*").eq("id", tag_id).execute()
+    if not tag_result.data:
+        raise HTTPException(status_code=404, detail="Tag not found")
+
+    tag = tag_result.data[0]
+    record_date = tag.get("record_date")
+
+    if not record_date:
+        raise HTTPException(status_code=400, detail="Tag has no record_date")
+
+    # Validate models exist
+    if not AUDIO_MODEL_PATH.exists() or not VIDEO_MODEL_PATH.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="ML models not found. Please ensure models are deployed."
+        )
+
+    # Validate file type
+    content_type = video.content_type or ""
+    if not content_type.startswith("video/"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type: {content_type}. Expected video file."
+        )
+
+    temp_path = None
+    try:
+        # Save uploaded video to temp file
+        suffix = Path(video.filename or "video.webm").suffix or ".webm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            content = await video.read()
+            tmp.write(content)
+            temp_path = Path(tmp.name)
+
+        # Run inference
+        from app.services.late_fusion import run_inference_cached
+
+        result = run_inference_cached(
+            video_file=temp_path,
+            audio_pt=AUDIO_MODEL_PATH,
+            video_pt=VIDEO_MODEL_PATH,
+        )
+
+        # Store result in database
+        inference_data = {
+            "tag_id": tag_id,
+            "record_date": record_date,
+            "predicted_emotion": result["pred_label"],
+            "pred_confidence": result["pred_confidence"],
+            "emotion_probabilities": result["emotion_probabilities"],
+        }
+
+        db_result = supabase.table("video_inferences").insert(inference_data).execute()
+
+        if not db_result.data:
+            raise HTTPException(status_code=500, detail="Failed to store inference result")
+
+        return VideoInferenceResult(
+            id=db_result.data[0]["id"],
+            tag_id=tag_id,
+            predicted_emotion=result["pred_label"],
+            pred_confidence=result["pred_confidence"],
+            emotion_probabilities=result["emotion_probabilities"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+    finally:
+        # Always clean up temp file
+        if temp_path and temp_path.exists():
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+
+@router.get("/tags/{tag_id}/inference")
+def get_tag_inference(tag_id: str):
+    """Get the video inference result for a specific tag."""
+    result = (
+        supabase.table("video_inferences")
+        .select("*")
+        .eq("tag_id", tag_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if not result.data:
+        return {"data": None, "message": "No inference found for this tag"}
 
     return {"data": result.data[0]}

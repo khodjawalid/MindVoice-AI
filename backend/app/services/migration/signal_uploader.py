@@ -10,7 +10,7 @@ Uploads processed Empatica signals to Supabase tables:
 import math
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import pandas as pd
 
@@ -59,16 +59,49 @@ class SignalUploader:
             base_dir or os.getenv("EMPATICA_LOCAL_DIR", "./empatica_data")
         )
 
-    def upload_day(self, date: str) -> Dict[str, Dict]:
+    def date_exists(self, date: str) -> bool:
+        """Check if data for this date already exists in Supabase."""
+        result = (
+            supabase.table("hr_aggregated")
+            .select("record_date")
+            .eq("record_date", date)
+            .limit(1)
+            .execute()
+        )
+        return len(result.data) > 0
+
+    def get_available_dates(self) -> list[str]:
+        """Get all dates that have processed data on disk."""
+        dates = []
+        if not self.base_dir.exists():
+            return dates
+        for folder in self.base_dir.iterdir():
+            if folder.is_dir() and folder.name.startswith("empatica_"):
+                date = folder.name.replace("empatica_", "")
+                processed_dir = folder / "processed_raw"
+                if processed_dir.exists() and any(processed_dir.iterdir()):
+                    dates.append(date)
+        dates.sort(reverse=True)
+        return dates
+
+    def upload_day(self, date: str, force: bool = False) -> Dict[str, Any]:
         """
         Upload all signals for a given date to Supabase.
 
         Args:
             date: Date string in YYYY-MM-DD format (e.g., "2026-01-22")
+            force: If True, overwrite existing data. If False, skip if data exists.
 
         Returns:
             Dict with results for each table upload
         """
+        if not force and self.date_exists(date):
+            return {
+                "status": "skipped",
+                "reason": "already_exists",
+                "date": date,
+            }
+
         results = {}
         results["eda_aggregated"] = self._upload_eda_aggregated(date)
         results["hr_aggregated"] = self._upload_hr_aggregated(date)

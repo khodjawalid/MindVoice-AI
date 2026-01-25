@@ -35,16 +35,28 @@ def fetch_by_date(table: str, date: str, order_by: str = "datetime_utc") -> List
 
 def get_available_dates() -> List[str]:
     """Get all distinct dates that have data (from hr_aggregated as reference)."""
-    res = (
-        supabase.table("hr_aggregated")
-        .select("record_date")
-        .order("record_date", desc=True)
-        .execute()
-    )
+    # Fetch all record_date values with pagination to avoid Supabase's 1000 row limit
+    all_dates = set()
+    offset = 0
 
-    # Extract unique dates
-    dates = list(set(row["record_date"] for row in res.data))
-    dates.sort(reverse=True)
+    while True:
+        res = (
+            supabase.table("hr_aggregated")
+            .select("record_date")
+            .order("record_date", desc=True)
+            .range(offset, offset + BATCH_SIZE - 1)
+            .execute()
+        )
+
+        for row in res.data:
+            all_dates.add(row["record_date"])
+
+        if len(res.data) < BATCH_SIZE:
+            break
+
+        offset += BATCH_SIZE
+
+    dates = sorted(all_dates, reverse=True)
     return dates
 
 

@@ -19,14 +19,11 @@ export async function POST() {
 
     const syncData = await syncRes.json();
 
-    // Step 2: Migrate processed data to Supabase
-    const migrateRes = await fetch(
-      `http://localhost:8000/sync/migrate/${syncData.date}`,
-      {
-        method: "POST",
-        cache: "no-store",
-      }
-    );
+    // Step 2: Migrate ALL processed data to Supabase (skips existing)
+    const migrateRes = await fetch("http://localhost:8000/sync/migrate-all", {
+      method: "POST",
+      cache: "no-store",
+    });
 
     let migrateData = null;
     if (migrateRes.ok) {

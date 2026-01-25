@@ -87,8 +87,20 @@ def sync_empatica(payload: EmpaticaSyncRequest):
         )
 
 
+@router.get("/available-dates")
+def get_available_dates():
+    """
+    Get all dates that have processed Empatica data on disk.
+
+    Returns:
+        List of dates in YYYY-MM-DD format, sorted descending.
+    """
+    uploader = SignalUploader()
+    return {"dates": uploader.get_available_dates()}
+
+
 @router.post("/migrate/{date}")
-def migrate_signals(date: str):
+def migrate_signals(date: str, force: bool = False):
     """
     Migrate the 3 aggregated signals for a date to Supabase.
 
@@ -97,12 +109,17 @@ def migrate_signals(date: str):
     - hr_aggregated: HR per-minute (~1.4K rows/day)
     - tags: User-tagged events (~12 rows/day)
 
-    This endpoint is idempotent - it will delete existing data for the date
-    before inserting new data.
+    Args:
+        date: Date in YYYY-MM-DD format
+        force: If True, overwrite existing data. If False, skip if data exists.
     """
     try:
         uploader = SignalUploader()
-        results = uploader.upload_day(date)
+        results = uploader.upload_day(date, force=force)
+
+        # Check if skipped
+        if results.get("status") == "skipped":
+            return results
 
         # Check if any uploads failed
         errors = [
@@ -121,6 +138,49 @@ def migrate_signals(date: str):
         return {
             "status": "success",
             "date": date,
+            "results": results,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Migration failed: {str(e)}",
+        )
+
+
+@router.post("/migrate-all")
+def migrate_all_signals():
+    """
+    Migrate all dates that have processed data on disk but not in Supabase.
+
+    This endpoint is safe to call multiple times - it will skip dates that
+    already have data in Supabase.
+
+    Returns:
+        Dict with results for each date.
+    """
+    try:
+        uploader = SignalUploader()
+        available_dates = uploader.get_available_dates()
+
+        if not available_dates:
+            return {
+                "status": "no_data",
+                "message": "No processed data found on disk",
+            }
+
+        results = {}
+        for date in available_dates:
+            results[date] = uploader.upload_day(date, force=False)
+
+        # Count successes and skips
+        migrated = [d for d, r in results.items() if r.get("status") != "skipped"]
+        skipped = [d for d, r in results.items() if r.get("status") == "skipped"]
+
+        return {
+            "status": "success",
+            "migrated_count": len(migrated),
+            "skipped_count": len(skipped),
             "results": results,
         }
 
