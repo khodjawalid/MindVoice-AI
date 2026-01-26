@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { BarChart3, Activity, Heart, ChevronRight } from "lucide-react";
 
 interface TableResult {
   status: string;
@@ -47,28 +49,54 @@ export default function Home() {
   };
 
   return (
-    <main className="p-8 space-y-8">
-      <h1 className="text-2xl font-bold">MindVoice</h1>
-      <nav className="space-y-2">
-        <Link href="/dashboard" className="block text-blue-600 hover:underline">
-          Stress Dashboard &rarr;
+    <main className="p-8 max-w-4xl mx-auto space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">MindVoice</h1>
+        <p className="text-muted-foreground">Your personal wellness companion</p>
+      </div>
+
+      <nav className="grid gap-3">
+        <Link
+          href="/dashboard"
+          className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary/50 hover:shadow-soft transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <BarChart3 className="w-5 h-5 text-sage" />
+            <span className="font-medium">Stress Dashboard</span>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
         </Link>
-        <Link href="/metrics" className="block text-blue-600 hover:underline">
-          View Metrics &rarr;
+        <Link
+          href="/metrics"
+          className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary/50 hover:shadow-soft transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <Activity className="w-5 h-5 text-sage" />
+            <span className="font-medium">View Metrics</span>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
         </Link>
-        <Link href="/wellness" className="block text-blue-600 hover:underline">
-          Wellness Session &rarr;
+        <Link
+          href="/wellness"
+          className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary/50 hover:shadow-soft transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <Heart className="w-5 h-5 text-sage" />
+            <span className="font-medium">Wellness Session</span>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
         </Link>
       </nav>
 
-      <section className="space-y-2">
-        <button
+      <section className="space-y-3">
+        <Button
           onClick={handleSync}
           disabled={syncing}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          variant="sync"
+          size="lg"
         >
           {syncing ? "Syncing..." : "Sync Empatica"}
-        </button>
+        </Button>
         {syncResult && (
           <div className="text-sm space-y-1">
             <p className={syncResult.status === "error" ? "text-red-600" : "text-green-600"}>

@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import StressScoreChart from "@/components/StressScoreChart";
 import { VideoInferenceChart } from "@/components/VideoInferenceChart";
 import { ArrowLeft, RefreshCw, Calendar, Tag } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface StressScore {
   id: string;
@@ -25,14 +28,13 @@ interface TagData {
   reviewed?: boolean;
 }
 
-interface VideoInference {
+interface DailyInference {
   id: string;
-  tag_id: string;
   record_date: string;
   predicted_emotion: string;
   pred_confidence: number;
   emotion_probabilities: Record<string, number>;
-  created_at: string;
+  created_at?: string;
 }
 
 interface DashboardData {
@@ -49,25 +51,12 @@ interface DashboardData {
   has_data: boolean;
 }
 
-interface VideoInferenceData {
-  date: string;
-  data: VideoInference[];
-  count: number;
-  summary: {
-    total_recordings?: number;
-    dominant_emotion?: string;
-    dominant_confidence?: number;
-    emotion_averages?: Record<string, number>;
-  };
-}
-
 export default function DashboardDatePage() {
   const params = useParams();
-  const router = useRouter();
   const date = params.date as string;
 
   const [data, setData] = useState<DashboardData | null>(null);
-  const [videoInferences, setVideoInferences] = useState<VideoInferenceData | null>(null);
+  const [dailyInference, setDailyInference] = useState<DailyInference | null>(null);
   const [loading, setLoading] = useState(true);
   const [inferring, setInferring] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,10 +65,10 @@ export default function DashboardDatePage() {
     setLoading(true);
     setError(null);
     try {
-      // Fetch both dashboard data and video inferences in parallel
-      const [dashboardRes, videoRes] = await Promise.all([
+      // Fetch both dashboard data and daily inference in parallel
+      const [dashboardRes, dailyRes] = await Promise.all([
         fetch(`/api/dashboard?date=${date}`),
-        fetch(`/api/dashboard/video-inferences?date=${date}`),
+        fetch(`/api/dashboard/daily-inference?date=${date}`),
       ]);
 
       if (!dashboardRes.ok) {
@@ -88,9 +77,9 @@ export default function DashboardDatePage() {
       const dashboardResult = await dashboardRes.json();
       setData(dashboardResult);
 
-      if (videoRes.ok) {
-        const videoResult = await videoRes.json();
-        setVideoInferences(videoResult);
+      if (dailyRes.ok) {
+        const dailyResult = await dailyRes.json();
+        setDailyInference(dailyResult.data);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -137,12 +126,11 @@ export default function DashboardDatePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href="/dashboard"
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/dashboard">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+          </Button>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
             <p className="text-muted-foreground flex items-center gap-2">
@@ -152,18 +140,16 @@ export default function DashboardDatePage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => runInference(true)}
-            disabled={inferring}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${inferring ? "animate-spin" : ""}`}
-            />
-            {inferring ? "Running..." : "Re-run Inference"}
-          </button>
-        </div>
+        <Button
+          onClick={() => runInference(true)}
+          disabled={inferring}
+          variant="default"
+        >
+          <RefreshCw
+            className={`w-4 h-4 ${inferring ? "animate-spin" : ""}`}
+          />
+          {inferring ? "Running..." : "Re-run Inference"}
+        </Button>
       </div>
 
       {/* Error State */}
@@ -175,8 +161,14 @@ export default function DashboardDatePage() {
 
       {/* Loading State */}
       {loading && (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading dashboard data...</div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+          </div>
+          <Skeleton className="h-64 rounded-xl" />
         </div>
       )}
 
@@ -229,11 +221,10 @@ export default function DashboardDatePage() {
             isLoading={loading}
           />
 
-          {/* Video Emotion Analysis Chart */}
+          {/* Daily Video Emotion Analysis Chart */}
           <VideoInferenceChart
-            inferences={videoInferences?.data || []}
+            dailyInference={dailyInference}
             date={date}
-            tags={data.tags}
           />
 
           {/* Reviewed Tags Section */}
@@ -297,13 +288,13 @@ export default function DashboardDatePage() {
               <p className="text-muted-foreground mb-4">
                 No inference data available for this date.
               </p>
-              <button
+              <Button
                 onClick={() => runInference(false)}
                 disabled={inferring}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                variant="sage"
               >
                 Run Inference
-              </button>
+              </Button>
             </div>
           )}
         </>

@@ -64,13 +64,50 @@ def preprocess_frame(frame_bgr, img_size):
 
 def sample_frames(video_path, num_frames=16):
     """Uniformly sample frames from a video."""
+    video_path = Path(video_path)
+
+    # Try direct OpenCV first
     cap = cv2.VideoCapture(str(video_path))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+    # If OpenCV can't read frame count (common with webm), convert via ffmpeg
     if total <= 0:
         cap.release()
+        ffmpeg = _guess_ffmpeg()
+        if ffmpeg:
+            # Convert to mp4 which OpenCV handles better
+            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                subprocess.run(
+                    [ffmpeg, "-y", "-i", str(video_path), "-c:v", "libx264",
+                     "-preset", "ultrafast", "-crf", "23", tmp_path],
+                    capture_output=True, check=True
+                )
+                cap = cv2.VideoCapture(tmp_path)
+                total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+                if total <= 0:
+                    cap.release()
+                    Path(tmp_path).unlink(missing_ok=True)
+                    return []
+
+                frames = _extract_frames(cap, total, num_frames)
+                cap.release()
+                Path(tmp_path).unlink(missing_ok=True)
+                return frames
+            except subprocess.CalledProcessError:
+                Path(tmp_path).unlink(missing_ok=True)
+                return []
         return []
 
+    frames = _extract_frames(cap, total, num_frames)
+    cap.release()
+    return frames
+
+
+def _extract_frames(cap, total, num_frames):
+    """Extract uniformly spaced frames from an open VideoCapture."""
     idxs = np.linspace(0, total - 1, num_frames).astype(int)
     frames = []
 
@@ -80,7 +117,6 @@ def sample_frames(video_path, num_frames=16):
         if ok:
             frames.append(frame)
 
-    cap.release()
     return frames
 
 

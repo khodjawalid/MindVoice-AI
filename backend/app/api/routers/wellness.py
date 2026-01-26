@@ -262,3 +262,130 @@ def get_tag_inference(tag_id: str):
         return {"data": None, "message": "No inference found for this tag"}
 
     return {"data": result.data[0]}
+
+
+# ========== Daily Video Inference Endpoints ==========
+
+
+class DailyVideoInferenceResult(BaseModel):
+    """Response model for daily video inference."""
+    id: str
+    record_date: str
+    predicted_emotion: str
+    pred_confidence: float
+    emotion_probabilities: dict
+
+
+@router.get("/daily-inference/{date}")
+def get_daily_inference(date: str):
+    """
+    Get the daily video inference result for a specific date.
+
+    Returns the inference result if it exists, or None if no daily video
+    has been recorded for this date yet.
+    """
+    result = (
+        supabase.table("daily_video_inferences")
+        .select("*")
+        .eq("record_date", date)
+        .limit(1)
+        .execute()
+    )
+
+    if not result.data:
+        return {"data": None, "exists": False}
+
+    return {"data": result.data[0], "exists": True}
+
+
+@router.post("/daily-inference/{date}")
+async def run_daily_video_inference(
+    date: str,
+    video: UploadFile = File(..., description="Daily video file for emotion inference"),
+):
+    """
+    Run video emotion inference for a daily summary video.
+
+    This endpoint is called after all tags for the day have been reviewed.
+    The video captures the user's overall emotional state for the day.
+    """
+    # Check if daily inference already exists
+    existing = (
+        supabase.table("daily_video_inferences")
+        .select("id")
+        .eq("record_date", date)
+        .limit(1)
+        .execute()
+    )
+
+    if existing.data:
+        # Delete existing inference to allow re-recording
+        supabase.table("daily_video_inferences").delete().eq("record_date", date).execute()
+
+    # Validate models exist
+    if not AUDIO_MODEL_PATH.exists() or not VIDEO_MODEL_PATH.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="ML models not found. Please ensure models are deployed."
+        )
+
+    # Validate file type
+    content_type = video.content_type or ""
+    if not content_type.startswith("video/"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type: {content_type}. Expected video file."
+        )
+
+    temp_path = None
+    try:
+        # Save uploaded video to temp file
+        suffix = Path(video.filename or "video.webm").suffix or ".webm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            content = await video.read()
+            tmp.write(content)
+            temp_path = Path(tmp.name)
+
+        # Run inference
+        from app.services.late_fusion import run_inference_cached
+
+        result = run_inference_cached(
+            video_file=temp_path,
+            audio_pt=AUDIO_MODEL_PATH,
+            video_pt=VIDEO_MODEL_PATH,
+        )
+
+        # Store result in daily_video_inferences table
+        inference_data = {
+            "record_date": date,
+            "predicted_emotion": result["pred_label"],
+            "pred_confidence": result["pred_confidence"],
+            "emotion_probabilities": result["emotion_probabilities"],
+        }
+
+        db_result = supabase.table("daily_video_inferences").insert(inference_data).execute()
+
+        if not db_result.data:
+            raise HTTPException(status_code=500, detail="Failed to store inference result")
+
+        return DailyVideoInferenceResult(
+            id=db_result.data[0]["id"],
+            record_date=date,
+            predicted_emotion=result["pred_label"],
+            pred_confidence=result["pred_confidence"],
+            emotion_probabilities=result["emotion_probabilities"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+    finally:
+        # Always clean up temp file
+        if temp_path and temp_path.exists():
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
