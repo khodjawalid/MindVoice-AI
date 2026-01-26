@@ -1,9 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
+import { Header } from "@/components/layout/Header";
+import { DashboardCard } from "@/components/dashboard/DashboardCard";
+import { Heart, Activity, Calendar } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Activity, Heart, ChevronRight } from "lucide-react";
 
 interface TableResult {
   status: string;
@@ -49,92 +51,95 @@ export default function Home() {
   };
 
   return (
-    <main className="p-8 max-w-4xl mx-auto space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold">MindVoice</h1>
-        <p className="text-muted-foreground">Your personal wellness companion</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header variant="dashboard" userName="Matthieu" />
 
-      <nav className="grid gap-3">
-        <Link
-          href="/dashboard"
-          className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary/50 hover:shadow-soft transition-all group"
-        >
-          <div className="flex items-center gap-3">
-            <BarChart3 className="w-5 h-5 text-sage" />
-            <span className="font-medium">Stress Dashboard</span>
-          </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </Link>
-        <Link
-          href="/metrics"
-          className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary/50 hover:shadow-soft transition-all group"
-        >
-          <div className="flex items-center gap-3">
-            <Activity className="w-5 h-5 text-sage" />
-            <span className="font-medium">View Metrics</span>
-          </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </Link>
-        <Link
-          href="/wellness"
-          className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary/50 hover:shadow-soft transition-all group"
-        >
-          <div className="flex items-center gap-3">
-            <Heart className="w-5 h-5 text-sage" />
-            <span className="font-medium">Wellness Session</span>
-          </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </Link>
-      </nav>
+      <main className="pt-24 pb-12 px-6">
+        <div className="container mx-auto max-w-4xl">
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="font-serif text-2xl font-semibold text-foreground mb-8"
+          >
+            Hello Matthieu
+          </motion.h1>
 
-      <section className="space-y-3">
-        <Button
-          onClick={handleSync}
-          disabled={syncing}
-          variant="sync"
-          size="lg"
-        >
-          {syncing ? "Syncing..." : "Sync Empatica"}
-        </Button>
-        {syncResult && (
-          <div className="text-sm space-y-1">
-            <p className={syncResult.status === "error" ? "text-red-600" : "text-green-600"}>
-              Sync: {syncResult.status} {syncResult.date && `(${syncResult.date})`}
-            </p>
-            {syncResult.migration && (
-              <div className="pl-4 text-gray-600">
-                <p>
-                  Migration: {syncResult.migration.status}
-                  {syncResult.migration.migrated_count !== undefined && (
-                    <span className="ml-2">
-                      ({syncResult.migration.migrated_count} migrated, {syncResult.migration.skipped_count} skipped)
-                    </span>
-                  )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            <DashboardCard
+              title="Wellness"
+              icon={Heart}
+              href="/wellness"
+              delay={0.1}
+            />
+            <DashboardCard
+              title="Key Metrics"
+              icon={Activity}
+              href="/dashboard"
+              delay={0.2}
+            />
+            <DashboardCard
+              title="Dashboard"
+              icon={Calendar}
+              href="/metrics"
+              delay={0.3}
+            />
+          </div>
+
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="space-y-3"
+          >
+            <Button
+              onClick={handleSync}
+              disabled={syncing}
+              variant="sync"
+              size="lg"
+            >
+              {syncing ? "Syncing..." : "Sync Empatica"}
+            </Button>
+            {syncResult && (
+              <div className="text-sm space-y-1">
+                <p className={syncResult.status === "error" ? "text-red-600" : "text-green-600"}>
+                  Sync: {syncResult.status} {syncResult.date && `(${syncResult.date})`}
                 </p>
-                {syncResult.migration.results && (
-                  <ul className="pl-4 text-xs space-y-1">
-                    {Object.entries(syncResult.migration.results).map(([date, result]) => (
-                      <li key={date}>
-                        {date}:{" "}
-                        {result.status === "skipped" ? (
-                          <span className="text-gray-500">skipped (already exists)</span>
-                        ) : (
-                          <span className="text-green-600">
-                            migrated ({result.eda_aggregated?.rows_uploaded ?? 0} EDA,{" "}
-                            {result.hr_aggregated?.rows_uploaded ?? 0} HR,{" "}
-                            {result.tags?.rows_uploaded ?? 0} tags)
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                {syncResult.migration && (
+                  <div className="pl-4 text-muted-foreground">
+                    <p>
+                      Migration: {syncResult.migration.status}
+                      {syncResult.migration.migrated_count !== undefined && (
+                        <span className="ml-2">
+                          ({syncResult.migration.migrated_count} migrated, {syncResult.migration.skipped_count} skipped)
+                        </span>
+                      )}
+                    </p>
+                    {syncResult.migration.results && (
+                      <ul className="pl-4 text-xs space-y-1">
+                        {Object.entries(syncResult.migration.results).map(([date, result]) => (
+                          <li key={date}>
+                            {date}:{" "}
+                            {result.status === "skipped" ? (
+                              <span className="text-muted-foreground">skipped (already exists)</span>
+                            ) : (
+                              <span className="text-green-600">
+                                migrated ({result.eda_aggregated?.rows_uploaded ?? 0} EDA,{" "}
+                                {result.hr_aggregated?.rows_uploaded ?? 0} HR,{" "}
+                                {result.tags?.rows_uploaded ?? 0} tags)
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
               </div>
             )}
-          </div>
-        )}
-      </section>
-    </main>
+          </motion.section>
+        </div>
+      </main>
+    </div>
   );
 }
