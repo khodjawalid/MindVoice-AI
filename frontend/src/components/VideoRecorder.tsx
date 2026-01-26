@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Video, Square, Loader2, X, AlertCircle, CheckCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface VideoRecorderProps {
   isOpen: boolean;
@@ -32,6 +33,18 @@ export function VideoRecorder({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    
+    // Clear the live video feed when stopping
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
 
   // Initialize camera when modal opens
   useEffect(() => {
@@ -68,7 +81,20 @@ export function VideoRecorder({
         clearInterval(timerRef.current);
       }
     };
-  }, [isRecording, maxDuration]);
+  }, [isRecording, maxDuration, stopRecording]);
+
+  // Set up preview video when blob is ready and preview element is mounted
+  useEffect(() => {
+    if (recordedBlob && isPreviewing && previewVideoRef.current) {
+      const url = URL.createObjectURL(recordedBlob);
+      previewVideoRef.current.src = url;
+      previewVideoRef.current.load();
+      previewVideoRef.current.play().catch((e) => {
+        console.log("Autoplay prevented:", e);
+      });
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [recordedBlob, isPreviewing]);
 
   const initializeCamera = async () => {
     try {
@@ -144,11 +170,7 @@ export function VideoRecorder({
       const blob = new Blob(chunksRef.current, { type: mimeType });
       setRecordedBlob(blob);
       setIsPreviewing(true);
-
-      // Set up preview video
-      if (previewVideoRef.current) {
-        previewVideoRef.current.src = URL.createObjectURL(blob);
-      }
+      // Preview video src is set via useEffect when recordedBlob changes
     };
 
     mediaRecorderRef.current = mediaRecorder;
@@ -156,20 +178,14 @@ export function VideoRecorder({
     setIsRecording(true);
   }, []);
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-  }, []);
-
   const retakeRecording = () => {
-    if (previewVideoRef.current?.src) {
-      URL.revokeObjectURL(previewVideoRef.current.src);
-    }
     setRecordedBlob(null);
     setIsPreviewing(false);
     setElapsedTime(0);
+    // Reinitialize the camera for the live feed
+    if (videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
   };
 
   const submitRecording = () => {
@@ -216,15 +232,12 @@ export function VideoRecorder({
             {/* Header */}
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Video className="h-5 w-5 text-primary" />
+                <Video className="h-5 w-5 text-sage" />
                 <h2 className="text-lg font-semibold">Record Video Response</h2>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-full hover:bg-muted transition-colors"
-              >
+              <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             {/* Prompt */}
@@ -239,19 +252,16 @@ export function VideoRecorder({
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-6">
                   <AlertCircle className="h-12 w-12 text-red-400 mb-4" />
                   <p className="text-center text-red-200">{error}</p>
-                  <button
-                    onClick={initializeCamera}
-                    className="mt-4 px-4 py-2 bg-primary rounded-lg hover:bg-primary/90 transition-colors"
-                  >
+                  <Button onClick={initializeCamera} variant="default" className="mt-4">
                     Try Again
-                  </button>
+                  </Button>
                 </div>
               ) : isPreviewing ? (
                 <video
                   ref={previewVideoRef}
                   className="w-full h-full object-cover"
                   controls
-                  autoPlay
+                  playsInline
                 />
               ) : (
                 <>
@@ -289,19 +299,16 @@ export function VideoRecorder({
             <div className="px-6 py-4 border-t flex items-center justify-between">
               {isPreviewing ? (
                 <>
-                  <button
-                    onClick={retakeRecording}
-                    className="px-4 py-2 rounded-lg border hover:bg-muted transition-colors"
-                  >
+                  <Button variant="outline" onClick={retakeRecording}>
                     Retake
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={submitRecording}
-                    className="px-6 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors flex items-center gap-2"
+                    className="bg-green-600 hover:bg-green-700 text-white"
                   >
                     <CheckCircle className="h-4 w-4" />
                     Use This Recording
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <>
@@ -309,22 +316,22 @@ export function VideoRecorder({
                     Max duration: {maxDuration} seconds
                   </p>
                   {isRecording ? (
-                    <button
+                    <Button
                       onClick={stopRecording}
-                      className="px-6 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-2"
+                      variant="destructive"
                     >
                       <Square className="h-4 w-4" />
                       Stop Recording
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button
                       onClick={startRecording}
                       disabled={!permissionGranted}
-                      className="px-6 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                      variant="sage"
                     >
                       <Video className="h-4 w-4" />
                       Start Recording
-                    </button>
+                    </Button>
                   )}
                 </>
               )}

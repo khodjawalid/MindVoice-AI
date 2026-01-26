@@ -4,6 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import { HeartRateChartWrapper } from "@/components/HeartRateChartWrapper";
 import { EDAChartWrapper } from "@/components/EDAChartWrapper";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface HRDataPoint {
   datetime_utc: string;
@@ -84,13 +94,6 @@ export default function MetricsPage() {
     fetchMetrics();
   }, [fetchMetrics]);
 
-  // Handle date selection change
-  const handleDateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const date = e.target.value;
-    setSelectedDate(date);
-    fetchMetrics(date);
-  };
-
   const formatDisplayDate = (dateStr: string) => {
     const date = new Date(dateStr + "T00:00:00");
     return date.toLocaleDateString("en-US", {
@@ -102,37 +105,43 @@ export default function MetricsPage() {
   };
 
   return (
-    <main className="p-8 space-y-8">
+    <main className="p-8 max-w-6xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-muted-foreground hover:text-foreground">
-            &larr; Back
-          </Link>
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+          </Button>
           <h1 className="text-2xl font-bold">Metrics</h1>
         </div>
 
         {/* Date Selector */}
         <div className="flex items-center gap-2">
-          <label htmlFor="date-select" className="text-sm text-muted-foreground">
-            Date:
-          </label>
-          <select
-            id="date-select"
-            value={selectedDate}
-            onChange={handleDateChange}
-            disabled={isLoading || availableDates.length === 0}
-            className="px-3 py-1.5 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-          >
-            {availableDates.length === 0 ? (
-              <option value="">No data available</option>
-            ) : (
-              availableDates.map((date) => (
-                <option key={date} value={date}>
-                  {formatDisplayDate(date)}
-                </option>
-              ))
-            )}
-          </select>
+          <span className="text-sm text-muted-foreground">Date:</span>
+          {availableDates.length === 0 ? (
+            <span className="text-sm text-muted-foreground">No data available</span>
+          ) : (
+            <Select
+              value={selectedDate}
+              onValueChange={(value) => {
+                setSelectedDate(value);
+                fetchMetrics(value);
+              }}
+              disabled={isLoading}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select date" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDates.map((date) => (
+                  <SelectItem key={date} value={date}>
+                    {formatDisplayDate(date)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
@@ -142,20 +151,30 @@ export default function MetricsPage() {
         </div>
       )}
 
-      {/* Charts */}
-      <div className="grid gap-8">
-        <HeartRateChartWrapper
-          data={metricsData?.hr || []}
-          tags={metricsData?.tags || []}
-          isLoading={isLoading}
-        />
+      {/* Loading State */}
+      {isLoading && (
+        <div className="grid gap-8">
+          <Skeleton className="h-80 w-full rounded-xl" />
+          <Skeleton className="h-80 w-full rounded-xl" />
+        </div>
+      )}
 
-        <EDAChartWrapper
-          data={metricsData?.eda || []}
-          tags={metricsData?.tags || []}
-          isLoading={isLoading}
-        />
-      </div>
+      {/* Charts */}
+      {!isLoading && (
+        <div className="grid gap-8">
+          <HeartRateChartWrapper
+            data={metricsData?.hr || []}
+            tags={metricsData?.tags || []}
+            isLoading={isLoading}
+          />
+
+          <EDAChartWrapper
+            data={metricsData?.eda || []}
+            tags={metricsData?.tags || []}
+            isLoading={isLoading}
+          />
+        </div>
+      )}
 
       {/* Summary Stats */}
       {metricsData && !isLoading && (

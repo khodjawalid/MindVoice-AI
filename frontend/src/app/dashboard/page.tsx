@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Calendar, ChevronRight, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DateSummary {
   date: string;
@@ -43,15 +45,14 @@ export default function DashboardPage() {
     <main className="p-8 max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link
-          href="/"
-          className="p-2 rounded-lg hover:bg-muted transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+        </Button>
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-primary" />
+            <BarChart3 className="w-6 h-6 text-sage" />
             Stress Dashboard
           </h1>
           <p className="text-muted-foreground">
@@ -62,8 +63,10 @@ export default function DashboardPage() {
 
       {/* Loading State */}
       {loading && (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading available dates...</div>
+        <div className="space-y-3">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
         </div>
       )}
 
@@ -74,12 +77,9 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">
             No data available. Sync Empatica data to get started.
           </p>
-          <Link
-            href="/"
-            className="inline-block mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
-            Go to Home
-          </Link>
+          <Button variant="sage" className="mt-4" asChild>
+            <Link href="/">Go to Home</Link>
+          </Button>
         </div>
       )}
 
