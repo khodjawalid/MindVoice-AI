@@ -3,9 +3,12 @@
 backend/.env
 
 # Data files
-empatica/
+/empatica/
 *.avro
 *.csv
+
+videos/
+
 
 # ML models (too large: 400MB+)
 *.pt
@@ -29,6 +32,8 @@ node_modules/
 .idea/
 .vscode/
 *.swp
+CLAUDE.md
+PROJECT_CONTEXT.md
 
 # Archives
 archives/

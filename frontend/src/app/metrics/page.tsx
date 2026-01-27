@@ -105,94 +105,99 @@ export default function MetricsPage() {
   };
 
   return (
-    <main className="p-8 max-w-6xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Metrics</h1>
+    <main className="min-h-screen bg-background">
+      <div className="p-8 max-w-6xl mx-auto space-y-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild className="rounded-full hover:bg-sage-light">
+              <Link href="/home">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="font-serif text-2xl md:text-3xl font-medium text-foreground">Key Metrics</h1>
+              <p className="text-sm text-muted-foreground">Heart rate and electrodermal activity</p>
+            </div>
+          </div>
+
+          {/* Date Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Date:</span>
+            {availableDates.length === 0 ? (
+              <span className="text-sm text-muted-foreground">No data available</span>
+            ) : (
+              <Select
+                value={selectedDate}
+                onValueChange={(value) => {
+                  setSelectedDate(value);
+                  fetchMetrics(value);
+                }}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-[200px] rounded-full border-sage/30 focus:ring-sage">
+                  <SelectValue placeholder="Select date" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDates.map((date) => (
+                    <SelectItem key={date} value={date}>
+                      {formatDisplayDate(date)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
 
-        {/* Date Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Date:</span>
-          {availableDates.length === 0 ? (
-            <span className="text-sm text-muted-foreground">No data available</span>
-          ) : (
-            <Select
-              value={selectedDate}
-              onValueChange={(value) => {
-                setSelectedDate(value);
-                fetchMetrics(value);
-              }}
-              disabled={isLoading}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select date" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableDates.map((date) => (
-                  <SelectItem key={date} value={date}>
-                    {formatDisplayDate(date)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+        {error && (
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-600">
+            {error}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="grid gap-8">
+            <Skeleton className="h-80 w-full rounded-2xl" />
+            <Skeleton className="h-80 w-full rounded-2xl" />
+          </div>
+        )}
+
+        {/* Charts */}
+        {!isLoading && (
+          <div className="grid gap-8">
+            <HeartRateChartWrapper
+              data={metricsData?.hr || []}
+              tags={metricsData?.tags || []}
+              isLoading={isLoading}
+            />
+
+            <EDAChartWrapper
+              data={metricsData?.eda || []}
+              tags={metricsData?.tags || []}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
+
+        {/* Summary Stats */}
+        {metricsData && !isLoading && (
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="p-5 bg-sage-light/50 border border-sage/10 rounded-2xl">
+              <p className="text-muted-foreground">HR Data Points</p>
+              <p className="font-serif text-2xl font-medium text-foreground">{metricsData.hr.length}</p>
+            </div>
+            <div className="p-5 bg-sage-light/50 border border-sage/10 rounded-2xl">
+              <p className="text-muted-foreground">EDA Data Points</p>
+              <p className="font-serif text-2xl font-medium text-foreground">{metricsData.eda.length}</p>
+            </div>
+            <div className="p-5 bg-sage-light/50 border border-sage/10 rounded-2xl">
+              <p className="text-muted-foreground">Tags</p>
+              <p className="font-serif text-2xl font-medium text-foreground">{metricsData.tags.length}</p>
+            </div>
+          </div>
+        )}
       </div>
-
-      {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600">
-          {error}
-        </div>
-      )}
-
-      {/* Loading State */}
-      {isLoading && (
-        <div className="grid gap-8">
-          <Skeleton className="h-80 w-full rounded-xl" />
-          <Skeleton className="h-80 w-full rounded-xl" />
-        </div>
-      )}
-
-      {/* Charts */}
-      {!isLoading && (
-        <div className="grid gap-8">
-          <HeartRateChartWrapper
-            data={metricsData?.hr || []}
-            tags={metricsData?.tags || []}
-            isLoading={isLoading}
-          />
-
-          <EDAChartWrapper
-            data={metricsData?.eda || []}
-            tags={metricsData?.tags || []}
-            isLoading={isLoading}
-          />
-        </div>
-      )}
-
-      {/* Summary Stats */}
-      {metricsData && !isLoading && (
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <p className="text-muted-foreground">HR Data Points</p>
-            <p className="text-2xl font-medium">{metricsData.hr.length}</p>
-          </div>
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <p className="text-muted-foreground">EDA Data Points</p>
-            <p className="text-2xl font-medium">{metricsData.eda.length}</p>
-          </div>
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <p className="text-muted-foreground">Tags</p>
-            <p className="text-2xl font-medium">{metricsData.tags.length}</p>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
