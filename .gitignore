@@ -3,9 +3,12 @@
 backend/.env
 
 # Data files
-empatica/
+/empatica/
 *.avro
 *.csv
+
+videos/
+
 
 # ML models (too large: 400MB+)
 *.pt
