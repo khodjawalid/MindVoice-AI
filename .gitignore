@@ -29,6 +29,8 @@ node_modules/
 .idea/
 .vscode/
 *.swp
+CLAUDE.md
+PROJECT_CONTEXT.md
 
 # Archives
 archives/

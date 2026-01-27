@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { TagReviewList } from "@/components/TagReviewList";
 import { VideoRecorder } from "@/components/VideoRecorder";
 import Link from "next/link";
-import { Video, CheckCircle, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
+import { Video, CheckCircle, Loader2, AlertCircle, ArrowLeft, Eye, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -40,6 +40,9 @@ interface DailyInference {
   predicted_emotion: string;
   pred_confidence: number;
   emotion_probabilities: Record<string, number>;
+  backend?: string;
+  raw_face_emotions?: Record<string, number>;
+  raw_prosody_emotions?: Record<string, number>;
 }
 
 // Emotion color mapping
@@ -181,46 +184,50 @@ export default function WellnessPage() {
   const allTagsReviewed = tagsData && tagsData.count > 0 && pendingCount === 0;
 
   return (
-    <main className="p-8 max-w-4xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Wellness Tags</h1>
-        </div>
+    <main className="min-h-screen bg-background">
+      <div className="p-8 max-w-5xl mx-auto space-y-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild className="rounded-full hover:bg-sage-light">
+              <Link href="/home">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="font-serif text-2xl md:text-3xl font-medium text-foreground">Wellness Tags</h1>
+              <p className="text-sm text-muted-foreground">Review and label your daily moments</p>
+            </div>
+          </div>
 
-        {/* Date Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Date:</span>
-          {availableDates.length === 0 ? (
-            <span className="text-sm text-muted-foreground">No data available</span>
-          ) : (
-            <Select
-              value={selectedDate}
-              onValueChange={(value) => {
-                setSelectedDate(value);
-                setDailyInference(null);
-                fetchTags(value);
-              }}
-              disabled={isLoading}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select date" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableDates.map((date) => (
-                  <SelectItem key={date} value={date}>
-                    {formatDisplayDate(date)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          {/* Date Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Date:</span>
+            {availableDates.length === 0 ? (
+              <span className="text-sm text-muted-foreground">No data available</span>
+            ) : (
+              <Select
+                value={selectedDate}
+                onValueChange={(value) => {
+                  setSelectedDate(value);
+                  setDailyInference(null);
+                  fetchTags(value);
+                }}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-[200px] rounded-full border-sage/30 focus:ring-sage">
+                  <SelectValue placeholder="Select date" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDates.map((date) => (
+                    <SelectItem key={date} value={date}>
+                      {formatDisplayDate(date)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
-      </div>
 
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600">
@@ -281,9 +288,21 @@ export default function WellnessPage() {
             </div>
           ) : dailyInference ? (
             <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-600">Daily video recorded</span>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <span className="font-medium text-green-600">Daily video recorded</span>
+                </div>
+                {dailyInference.backend === "hume" && (
+                  <Badge variant="secondary" className="text-xs">
+                    Powered by Hume AI
+                  </Badge>
+                )}
+                {dailyInference.backend === "local" && (
+                  <Badge variant="outline" className="text-xs">
+                    Local Models
+                  </Badge>
+                )}
               </div>
 
               {/* Inference Result Display */}
@@ -326,6 +345,75 @@ export default function WellnessPage() {
                     ))}
                 </div>
 
+                {/* Face vs Audio Breakdown (Hume only) */}
+                {dailyInference.backend === "hume" &&
+                  (dailyInference.raw_face_emotions || dailyInference.raw_prosody_emotions) && (
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-xs text-muted-foreground mb-3">Face vs Audio breakdown:</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Face */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1 text-xs font-medium text-blue-700">
+                            <Eye className="h-3 w-3" />
+                            Face
+                          </div>
+                          {dailyInference.raw_face_emotions &&
+                            Object.entries(dailyInference.raw_face_emotions)
+                              .filter(([, score]) => score > 0)
+                              .sort(([, a], [, b]) => b - a)
+                              .slice(0, 3)
+                              .map(([emotion, score]) => (
+                                <div key={emotion} className="flex items-center gap-1 text-xs">
+                                  <span className="w-14 capitalize truncate text-muted-foreground">
+                                    {emotion}
+                                  </span>
+                                  <div className="flex-1 bg-blue-100 rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                      className="h-full bg-blue-500 rounded-full"
+                                      style={{ width: `${score * 100}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                          {(!dailyInference.raw_face_emotions ||
+                            Object.values(dailyInference.raw_face_emotions).every((v) => v === 0)) && (
+                            <p className="text-xs text-muted-foreground">No face detected</p>
+                          )}
+                        </div>
+
+                        {/* Audio */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1 text-xs font-medium text-purple-700">
+                            <Mic className="h-3 w-3" />
+                            Audio
+                          </div>
+                          {dailyInference.raw_prosody_emotions &&
+                            Object.entries(dailyInference.raw_prosody_emotions)
+                              .filter(([, score]) => score > 0)
+                              .sort(([, a], [, b]) => b - a)
+                              .slice(0, 3)
+                              .map(([emotion, score]) => (
+                                <div key={emotion} className="flex items-center gap-1 text-xs">
+                                  <span className="w-14 capitalize truncate text-muted-foreground">
+                                    {emotion}
+                                  </span>
+                                  <div className="flex-1 bg-purple-100 rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                      className="h-full bg-purple-500 rounded-full"
+                                      style={{ width: `${score * 100}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                          {(!dailyInference.raw_prosody_emotions ||
+                            Object.values(dailyInference.raw_prosody_emotions).every((v) => v === 0)) && (
+                            <p className="text-xs text-muted-foreground">No speech detected</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 <Button
                   onClick={() => setShowVideoRecorder(true)}
                   variant="outline"
@@ -336,7 +424,7 @@ export default function WellnessPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 text-center space-y-4">
+            <div className="bg-sage-light/50 border border-sage/20 rounded-2xl p-6 text-center space-y-4">
               {videoError && (
                 <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-lg p-3 mb-4">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -350,9 +438,8 @@ export default function WellnessPage() {
 
               <Button
                 onClick={() => setShowVideoRecorder(true)}
-                variant="sage"
                 size="lg"
-                className="mx-auto"
+                className="mx-auto rounded-full px-8 bg-sage hover:bg-sage-dark text-white"
               >
                 <Video className="h-4 w-4" />
                 Record Daily Video
@@ -362,14 +449,15 @@ export default function WellnessPage() {
         </div>
       )}
 
-      {/* Video Recorder Modal */}
-      <VideoRecorder
-        isOpen={showVideoRecorder}
-        onClose={() => setShowVideoRecorder(false)}
-        onRecordingComplete={handleVideoRecordingComplete}
-        maxDuration={30}
-        prompt="How was your day overall?"
-      />
+        {/* Video Recorder Modal */}
+        <VideoRecorder
+          isOpen={showVideoRecorder}
+          onClose={() => setShowVideoRecorder(false)}
+          onRecordingComplete={handleVideoRecordingComplete}
+          maxDuration={30}
+          prompt="How was your day overall?"
+        />
+      </div>
     </main>
   );
 }

@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS daily_video_inferences (
   predicted_emotion TEXT,
   pred_confidence FLOAT,
   emotion_probabilities JSONB,
+  backend TEXT DEFAULT 'local',
+  video_path TEXT,
+  raw_face_emotions JSONB,
+  raw_prosody_emotions JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
